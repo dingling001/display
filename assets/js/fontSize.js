@@ -1,51 +1,122 @@
-window.mobileUtil = function (a, b) {
-    document.getElementsByTagName("meta").viewport.remove();
-    var c = navigator.userAgent, d = /android|adr/gi.test(c), e = /iphone|ipod|ipad/gi.test(c) && !d, f = d || e;
-    return {
-        isAndroid: d,
-        isIos: e,
-        isMobile: f,
-        isNewsApp: /NewsApp\/[\d\.]+/gi.test(c),
-        isWeixin: /MicroMessenger/gi.test(c),
-        isQQ: /QQ\/\d/gi.test(c),
-        isYixin: /YiXin/gi.test(c),
-        isWeibo: /Weibo/gi.test(c),
-        isTXWeibo: /T(?:X|encent)MicroBlog/gi.test(c),
-        tapEvent: f ? "tap" : "click",
-        fixScreen: function () {
-            function c(a) {
-                return "initial-scale=" + a + ",maximum-scale=" + a + ",minimum-scale=" + a + ",user-scalable=no"
-            }
+著作权归作者所有。
+商业转载请联系作者获得授权,非商业转载请注明出处。
+链接:http://caibaojian.com/flexible-js.html
+    来源:http://caibaojian.com
 
-            var d = Math.min, g = b.querySelector("meta[name=\"viewport\"]"), h = g ? g.content : "",
-                i = h.match(/initial\-scale=([\d\.]+)/), j = h.match(/width=([^,\s]+)/);
-            if (!g) {
-                var k, l = b.documentElement, m = l.dataset.mw, n = e ? d(a.devicePixelRatio, 3) : 1, o = 1;
-                l.removeAttribute("data-mw"), l.dataset.dpr = n, g = b.createElement("meta"), g.name = "viewport", g.content = c(o), l.firstElementChild.appendChild(g);
-                var p = function () {
-                    var a = l.getBoundingClientRect().width;
-                    a / n > m && (a = m * n);
-                    var b = a / 7.5;
-                    l.style.fontSize = b + "px"
-                };
-                a.addEventListener("resize", function () {
-                    clearTimeout(k), k = setTimeout(p, 300)
-                }, !1), a.addEventListener("pageshow", function (a) {
-                    a.persisted && (clearTimeout(k), k = setTimeout(p, 300))
-                }, !1), p()
-            } else if (f && !i && j && "device-width" != j[1]) {
-                var q = parseInt(j[1]), r = a.innerWidth || q, s = a.outerWidth || r, t = a.screen.width || r,
-                    u = a.screen.availWidth || r, v = a.innerHeight || q, x = a.outerHeight || v,
-                    y = a.screen.height || v, z = a.screen.availHeight || v, A = d(r, s, t, u, v, x, y, z), o = A / q;
-                1 > o && (g.content = h + "," + c(o))
+        ;(function(win, lib) {
+    var doc = win.document;
+    var docEl = doc.documentElement;
+    var metaEl = doc.querySelector('meta[name="viewport"]');
+    var flexibleEl = doc.querySelector('meta[name="flexible"]');
+    var dpr = 0;
+    var scale = 0;
+    var tid;
+    var flexible = lib.flexible || (lib.flexible = {});
+
+    if (metaEl) {
+        console.warn('将根据已有的meta标签来设置缩放比例');
+        var match = metaEl.getAttribute('content').match(/initial\-scale=([\d\.]+)/);
+        if (match) {
+            scale = parseFloat(match[1]);
+            dpr = parseInt(1 / scale);
+        }
+    } else if (flexibleEl) {
+        var content = flexibleEl.getAttribute('content');
+        if (content) {
+            var initialDpr = content.match(/initial\-dpr=([\d\.]+)/);
+            var maximumDpr = content.match(/maximum\-dpr=([\d\.]+)/);
+            if (initialDpr) {
+                dpr = parseFloat(initialDpr[1]);
+                scale = parseFloat((1 / dpr).toFixed(2));
             }
-        },
-        getSearch: function (b) {
-            b = b || a.location.search;
-            var c = {}, d = /([^?=&]+)(=([^&]*))?/g;
-            return b && b.replace(d, function (a, b, d, e) {
-                c[b] = e
-            }), c
+            if (maximumDpr) {
+                dpr = parseFloat(maximumDpr[1]);
+                scale = parseFloat((1 / dpr).toFixed(2));
+            }
         }
     }
-}(window, document), mobileUtil.fixScreen();
+
+    if (!dpr && !scale) {
+        var isAndroid = win.navigator.appVersion.match(/android/gi);
+        var isIPhone = win.navigator.appVersion.match(/iphone/gi);
+        var devicePixelRatio = win.devicePixelRatio;
+        if (isIPhone) {
+            // iOS下，对于2和3的屏，用2倍的方案，其余的用1倍方案
+            if (devicePixelRatio >= 3 && (!dpr || dpr >= 3)) {
+                dpr = 3;
+            } else if (devicePixelRatio >= 2 && (!dpr || dpr >= 2)){
+                dpr = 2;
+            } else {
+                dpr = 1;
+            }
+        } else {
+            // 其他设备下，仍旧使用1倍的方案
+            dpr = 1;
+        }
+        scale = 1 / dpr;
+    }
+
+    docEl.setAttribute('data-dpr', dpr);
+    if (!metaEl) {
+        metaEl = doc.createElement('meta');
+        metaEl.setAttribute('name', 'viewport');
+        metaEl.setAttribute('content', 'initial-scale=' + scale + ', maximum-scale=' + scale + ', minimum-scale=' + scale + ', user-scalable=no');
+        if (docEl.firstElementChild) {
+            docEl.firstElementChild.appendChild(metaEl);
+        } else {
+            var wrap = doc.createElement('div');
+            wrap.appendChild(metaEl);
+            doc.write(wrap.innerHTML);
+        }
+    }
+
+    function refreshRem(){
+        var width = docEl.getBoundingClientRect().width;
+        if (width / dpr > 540) {
+            width = 540 * dpr;
+        }
+        var rem = width / 10;
+        docEl.style.fontSize = rem + 'px';
+        flexible.rem = win.rem = rem;
+    }
+
+    win.addEventListener('resize', function() {
+        clearTimeout(tid);
+        tid = setTimeout(refreshRem, 300);
+    }, false);
+    win.addEventListener('pageshow', function(e) {
+        if (e.persisted) {
+            clearTimeout(tid);
+            tid = setTimeout(refreshRem, 300);
+        }
+    }, false);
+
+    if (doc.readyState === 'complete') {
+        doc.body.style.fontSize = 12 * dpr + 'px';
+    } else {
+        doc.addEventListener('DOMContentLoaded', function(e) {
+            doc.body.style.fontSize = 12 * dpr + 'px';
+        }, false);
+    }
+
+
+    refreshRem();
+
+    flexible.dpr = win.dpr = dpr;
+    flexible.refreshRem = refreshRem;
+    flexible.rem2px = function(d) {
+        var val = parseFloat(d) * this.rem;
+        if (typeof d === 'string' && d.match(/rem$/)) {
+            val += 'px';
+        }
+        return val;
+    }
+    flexible.px2rem = function(d) {
+        var val = parseFloat(d) / this.rem;
+        if (typeof d === 'string' && d.match(/px$/)) {
+            val += 'rem';
+        }
+        return val;
+    }
+
+})(window, window['lib'] || (window['lib'] = {}));
