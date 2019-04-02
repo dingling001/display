@@ -1,7 +1,3 @@
-著作权归作者所有。
-商业转载请联系作者获得授权,非商业转载请注明出处。
-链接:http://caibaojian.com/flexible-js.html
-    来源:http://caibaojian.com
 
         ;(function(win, lib) {
     var doc = win.document;
